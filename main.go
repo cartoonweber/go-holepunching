@@ -2,12 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
+	"net/http"
 	"strconv"
 )
 
 func main() {
+	http.HandleFunc("/about", func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(rw, "This is from holepunching ")
+	})
 
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 func doServer(port int) {
 	msgBuf := make([]byte, 1024)
