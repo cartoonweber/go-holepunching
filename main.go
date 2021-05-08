@@ -10,7 +10,7 @@ import (
 
 func main() {
 	http.HandleFunc("/about", func(rw http.ResponseWriter, r *http.Request) {
-		fmt.Println("LALAA")
+		fmt.Println("LALAA 2")
 		fmt.Fprintf(rw, "This is from holepunching ")
 	})
 
