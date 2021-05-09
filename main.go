@@ -1,95 +1,91 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"net"
-	"net/http"
-	"strconv"
+    "fmt"
+    "io"
+    "net"
+    "time"
 )
 
 func main() {
-	http.HandleFunc("/about", func(rw http.ResponseWriter, r *http.Request) {
-		fmt.Println("LALAA 2")
-		fmt.Fprintf(rw, "This is from holepunching ")
-	})
-
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-func doServer(port int) {
-	msgBuf := make([]byte, 1024)
-
-	// Initiatlize a UDP listener
-	ln, err := net.ListenUDP("udp4", &net.UDPAddr{Port: port})
-	if err != nil {
-		fmt.Printf("Unable to listen on :%d\n", port)
-		return
-	}
-
-	fmt.Printf("Listening on :%d\n", port)
-
-	for {
-		fmt.Println("---")
-		// Await incoming packets
-		rcvLen, addr, err := ln.ReadFrom(msgBuf)
-		if err != nil {
-			fmt.Println("Transaction was initiated but encountered an error!")
-			continue
-		}
-
-		fmt.Printf("Received a packet from: %s\n\tSays: %s\n",
-			addr.String(), msgBuf[:rcvLen])
-
-		// Let the client confirm a hole was punched through to us
-		reply := "お帰り～"
-		copy(msgBuf, []byte(reply))
-		_, err = ln.WriteTo(msgBuf[:len(reply)], addr)
-
-		if err != nil {
-			fmt.Println("Socket closed unexpectedly!")
-			continue
-		}
-
-		fmt.Printf("Sent reply to %s\n\tReply: %s\n",
-			addr.String(), msgBuf[:len(reply)])
-	}
+  runUDPServer()
 }
 
-func doClient(remote string, port int) {
-	msgBuf := make([]byte, 1024)
+func runUDPServer() {
+  addr, err := net.ResolveUDPAddr("udp", ":8081")
+  if err != nil {
+    panic(err)
+  }
+  conn, err := net.ListenUDP("udp", addr)
+  if err != nil {
+    panic(err)
+  }
 
-	// Resolve the passed address as UDP4
-	toAddr, err := net.ResolveUDPAddr("udp4", remote+":"+strconv.Itoa(port))
-	if err != nil {
-		fmt.Printf("Could not resolve %s:%d\n", remote, port)
-		return
-	}
-
-	fmt.Printf("Trying to punch a hole to %s:%d\n", remote, port)
-
-	// Initiate the transaction (force IPv4 to demo firewall punch)
-	conn, err := net.DialUDP("udp4", nil, toAddr)
-	defer conn.Close()
-
-	if err != nil {
-		fmt.Printf("Unable to connect to %s:%d\n", remote, port)
-		return
-	}
-
-	// Initiate the transaction, creating the hole
-	msg := "ただいま～"
-	fmt.Fprintf(conn, msg)
-	fmt.Printf("Sent a UDP packet to %s:%d\n\tSent: %s\n", remote, port, msg)
-
-	// Await a response through our firewall hole
-	msgLen, fromAddr, err := conn.ReadFromUDP(msgBuf)
-	if err != nil {
-		fmt.Printf("Error reading UDP response!\n")
-		return
-	}
-
-	fmt.Printf("Received a UDP packet back from %s:%d\n\tResponse: %s\n",
-		fromAddr.IP, fromAddr.Port, msgBuf[:msgLen])
-
-	fmt.Println("Success: NAT traversed! ^-^")
+  for {
+    handleUDPClient(conn)
+  }
 }
+
+func handleUDPClient(conn *net.UDPConn) {
+  var buff [512]byte
+
+  _, addr, err := conn.ReadFromUDP(buff[:])
+
+  if err != nil {
+    fmt.Println("Err readfrom UDP", err)
+    return
+  }
+
+  fmt.Println("ServeIP: ", addr.IP.String(), " port: ", addr.Port)
+  daytime := time.Now().String()
+
+  _, err = conn.WriteToUDP([]byte(daytime), addr)
+
+  if err != nil {
+    fmt.Println("Err write to UDP", err)
+    return
+  }
+}
+func runTCp() {
+    service, err := net.ResolveTCPAddr("tcp", ":8080")
+    if err != nil {
+        panic(err)
+    }
+    listener, err := net.ListenTCP("tcp", service)
+    if err != nil {
+        panic(err)
+    }
+
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            fmt.Println(err)
+            continue
+        }
+
+        go handleClient(conn)
+    }
+}
+
+func handleClient(conn net.Conn) {
+    defer conn.Close()
+
+    var buf [512]byte
+    for {
+        n, err := conn.Read(buf[:])
+        if err != nil && err == io.EOF {
+            return
+        }
+
+        if err != nil {
+            panic(err)
+        }
+
+        fmt.Println("Emit back ", string(buf[:n]))
+        _, err = conn.Write(buf[:n])
+        if err != nil {
+            panic(err)
+        }
+    }
+}
+
