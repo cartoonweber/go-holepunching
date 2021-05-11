@@ -14,3 +14,6 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 holepunching-go
+*/__debug_bin
+sample/client/client
+*/**/__debug_bin
